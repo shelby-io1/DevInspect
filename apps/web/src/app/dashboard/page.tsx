@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, AlertTriangle, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import { Activity, CheckCircle2, Clock, GitBranch, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -21,17 +21,28 @@ export default async function DashboardPage() {
     throw new Error(reposError.message);
   }
 
+  const repoIds = repos?.map((r) => r.id) || [];
   const readyRepos = repos?.filter((r) => r.status === "ready") || [];
-  const totalIssues = 0;
+
+  let totalIssues = 0;
+  if (repoIds.length > 0) {
+    const { data: analyses } = await supabase
+      .from("analyses")
+      .select("total_issues")
+      .in("repository_id", repoIds)
+      .eq("status", "completed");
+    totalIssues = analyses?.reduce((sum, a) => sum + (a.total_issues || 0), 0) ?? 0;
+  }
+
   const avgScore = readyRepos.length
     ? Math.round(readyRepos.reduce((sum, r) => sum + (r.score || 0), 0) / readyRepos.length)
     : null;
 
   const scoreCards = [
-    { label: "Repositories", value: String(repos?.length || 0), detail: `${readyRepos.length} ready for review`, icon: Activity },
-    { label: "Avg. score", value: avgScore ? String(avgScore) : "--", detail: avgScore ? "Across all repos" : "No data yet", icon: ShieldCheck },
+    { label: "Repositories", value: String(repos?.length || 0), detail: `${readyRepos.length} ready for review`, icon: GitBranch },
+    { label: "Avg. score", value: avgScore ? String(avgScore) : "--", detail: avgScore ? "Across all repos" : "No data yet", icon: Activity },
     { label: "Total issues", value: String(totalIssues), detail: "Across all repositories", icon: Clock },
-    { label: "Status", value: String(readyRepos.length), detail: "Repositories ready", icon: CheckCircle2 }
+    { label: "Scanned", value: String(readyRepos.length), detail: "Repositories analyzed", icon: CheckCircle2 }
   ];
 
   return (

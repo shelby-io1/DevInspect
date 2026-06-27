@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, FileCode, GitBranch, Globe } from "lucide-react";
+import { ArrowLeft, FileCode, GitBranch, Globe, BarChart3, Calendar } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { detectLanguage } from "@/lib/github";
+import { RunAnalysisButton } from "@/components/repositories/run-analysis-button";
 
 function getFileIcon(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -41,6 +41,12 @@ export default async function RepositoryDetailPage({
     .select("id, path, language, size")
     .eq("repository_id", id)
     .order("path");
+
+  const { data: analyses } = await supabase
+    .from("analyses")
+    .select("*")
+    .eq("repository_id", id)
+    .order("created_at", { ascending: false });
 
   const langs = repo.metadata && typeof repo.metadata === "object" && "languages" in repo.metadata
     ? (repo.metadata.languages as Record<string, number>)
@@ -97,6 +103,55 @@ export default async function RepositoryDetailPage({
             <p className="mt-4 text-sm text-slate-600">{repo.description}</p>
           )}
         </div>
+
+        <div className="mt-6 rounded-lg border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Analysis</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Run static analysis to find bugs, security issues, and code quality problems.
+          </p>
+          <div className="mt-4">
+            <RunAnalysisButton repositoryId={id} />
+          </div>
+        </div>
+
+        {analyses && analyses.length > 0 && (
+          <div className="mt-6 rounded-lg border bg-white shadow-sm">
+            <div className="border-b p-5">
+              <h2 className="text-lg font-semibold">Analysis history</h2>
+            </div>
+            <div className="divide-y">
+              {analyses.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/dashboard/repositories/${id}/analysis/${a.id}`}
+                  className="flex items-center justify-between p-5 transition hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium">
+                        Analysis {new Date(a.created_at).toLocaleDateString("en-US", {
+                          month: "short", day: "numeric", year: "numeric",
+                          hour: "2-digit", minute: "2-digit"
+                        })}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {a.total_issues} issues · Score: {a.score ?? "--"}/100
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+                    a.status === "completed" ? "bg-emerald-50 text-emerald-700" :
+                    a.status === "failed" ? "bg-red-50 text-red-700" :
+                    "bg-blue-50 text-blue-700"
+                  }`}>
+                    {a.status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {langs && (
           <div className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
