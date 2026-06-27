@@ -63,6 +63,11 @@ export function AuthForm({
             {state.error}
           </div>
         ) : null}
+        {state.success ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {state.success}
+          </div>
+        ) : null}
 
         <Button disabled={isPending} type="submit">
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

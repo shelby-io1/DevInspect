@@ -11,6 +11,7 @@ const credentialsSchema = z.object({
 
 export type AuthState = {
   error?: string;
+  success?: string;
 };
 
 function parseCredentials(formData: FormData) {
@@ -45,13 +46,20 @@ export async function signUpAction(_state: AuthState, formData: FormData): Promi
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp(parsed.data);
+
+  const { data, error } = await supabase.auth.signUp(parsed.data);
 
   if (error) {
     return { error: error.message };
   }
 
-  redirect("/dashboard");
+  if (data.session) {
+    redirect("/dashboard");
+  }
+
+  return {
+    success: "Account created! Check your email for a confirmation link before signing in."
+  };
 }
 
 export async function signOutAction() {
