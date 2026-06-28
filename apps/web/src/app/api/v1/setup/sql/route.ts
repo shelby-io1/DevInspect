@@ -1,21 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env";
 
-export async function GET() {
-  try {
-    const supabase = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-
-    const { error } = await supabase.from("repositories").select("id", { count: "exact", head: true });
-    const configured = !error || error.code !== "42P01";
-
-    return NextResponse.json({
-      configured,
-      hint: "Run the SQL below in your Supabase dashboard SQL editor. Copy everything from -- START to -- END.",
-      sql: `-- START
+const SQL = `-- START
 CREATE TABLE IF NOT EXISTS repositories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -64,12 +49,8 @@ CREATE POLICY "Team members can view shared repositories"
 DROP POLICY IF EXISTS "Users can manage own repository files" ON repository_files;
 CREATE POLICY "Users can manage own repository files"
   ON repository_files FOR ALL
-  USING (
-    repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid())
-  );
+  USING (repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid()))
+  WITH CHECK (repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid()));
 
 DROP POLICY IF EXISTS "Team members can view shared repository files" ON repository_files;
 CREATE POLICY "Team members can view shared repository files"
@@ -132,12 +113,8 @@ ALTER TABLE analysis_issues ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage own analysis issues" ON analysis_issues;
 CREATE POLICY "Users can manage own analysis issues"
   ON analysis_issues FOR ALL
-  USING (
-    analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid())
-  );
+  USING (analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid()))
+  WITH CHECK (analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid()));
 
 DROP POLICY IF EXISTS "Team members can view shared analysis issues" ON analysis_issues;
 CREATE POLICY "Team members can view shared analysis issues"
@@ -160,12 +137,8 @@ ALTER TABLE ai_reports ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage own AI reports" ON ai_reports;
 CREATE POLICY "Users can manage own AI reports"
   ON ai_reports FOR ALL
-  USING (
-    analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid())
-  );
+  USING (analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid()))
+  WITH CHECK (analysis_id IN (SELECT id FROM analyses WHERE user_id = auth.uid()));
 
 DROP POLICY IF EXISTS "Team members can view shared AI reports" ON ai_reports;
 CREATE POLICY "Team members can view shared AI reports"
@@ -232,9 +205,7 @@ ALTER TABLE generated_documentation ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own generated documentation" ON generated_documentation;
 CREATE POLICY "Users can view own generated documentation"
   ON generated_documentation FOR SELECT
-  USING (
-    analysis_id IN (SELECT id FROM analyses WHERE repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid()))
-  );
+  USING (analysis_id IN (SELECT id FROM analyses WHERE repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid())));
 
 CREATE TABLE IF NOT EXISTS generated_tests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -252,9 +223,7 @@ ALTER TABLE generated_tests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own generated tests" ON generated_tests;
 CREATE POLICY "Users can view own generated tests"
   ON generated_tests FOR SELECT
-  USING (
-    analysis_id IN (SELECT id FROM analyses WHERE repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid()))
-  );
+  USING (analysis_id IN (SELECT id FROM analyses WHERE repository_id IN (SELECT id FROM repositories WHERE user_id = auth.uid())));
 
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -349,13 +318,10 @@ CREATE POLICY "Team members can insert messages" ON team_messages FOR INSERT
 
 CREATE INDEX IF NOT EXISTS idx_team_messages_team_id ON team_messages(team_id);
 CREATE INDEX IF NOT EXISTS idx_team_messages_created_at ON team_messages(created_at);
--- END`
-    });
-  } catch (err) {
-    return NextResponse.json({
-      configured: false,
-      error: err instanceof Error ? err.message : "Unknown error",
-      hint: "Database not reachable. Check your Supabase credentials."
-    });
-  }
+-- END`;
+
+export async function GET() {
+  return new NextResponse(SQL, {
+    headers: { "Content-Type": "text/plain" },
+  });
 }

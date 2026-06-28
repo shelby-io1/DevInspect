@@ -41,16 +41,7 @@ export default function HomePage() {
             Analyze repositories, surface security and quality issues, and turn review
             findings into clear engineering action from a focused SaaS dashboard.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href="/signup">
-                Create account <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/login">Open dashboard</Link>
-            </Button>
-          </div>
+
           <ul className="mt-8 grid gap-3 text-sm text-slate-700 sm:grid-cols-3">
             {features.map((feature) => (
               <li key={feature} className="flex items-start gap-2">

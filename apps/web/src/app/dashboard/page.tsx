@@ -3,6 +3,7 @@ import { Activity, CheckCircle2, Clock, GitBranch, ShieldCheck } from "lucide-re
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { DashboardCharts } from "@/components/dashboard-charts";
 import { ImportGitHubDialog } from "@/components/repositories/import-github-dialog";
 import { UploadZipDialog } from "@/components/repositories/upload-zip-dialog";
 
@@ -25,24 +26,37 @@ export default async function DashboardPage() {
   const readyRepos = repos?.filter((r) => r.status === "ready") || [];
 
   let totalIssues = 0;
+  let analyses: { total_issues: number | null; score: number | null; created_at: string; repository_id: string }[] = [];
   if (repoIds.length > 0) {
-    const { data: analyses } = await supabase
+    const { data: a } = await supabase
       .from("analyses")
-      .select("total_issues")
+      .select("total_issues, score, created_at, repository_id")
       .in("repository_id", repoIds)
       .eq("status", "completed");
-    totalIssues = analyses?.reduce((sum, a) => sum + (a.total_issues || 0), 0) ?? 0;
+    analyses = (a || []) as typeof analyses;
+    // Keep only the latest analysis per repo
+    const latestMap = new Map<string, typeof analyses[0]>();
+    for (const a of analyses) {
+      const existing = latestMap.get(a.repository_id);
+      if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+        latestMap.set(a.repository_id, a);
+      }
+    }
+    analyses = Array.from(latestMap.values());
+    totalIssues = analyses.reduce((sum, a) => sum + (a.total_issues || 0), 0) ?? 0;
   }
 
-  const avgScore = readyRepos.length
-    ? Math.round(readyRepos.reduce((sum, r) => sum + (r.score || 0), 0) / readyRepos.length)
+  const scannedCount = analyses.length;
+
+  const avgScore = analyses.length
+    ? Math.round(analyses.reduce((sum, a) => sum + (a.score || 0), 0) / analyses.length)
     : null;
 
   const scoreCards = [
     { label: "Repositories", value: String(repos?.length || 0), detail: `${readyRepos.length} ready for review`, icon: GitBranch },
     { label: "Avg. score", value: avgScore ? String(avgScore) : "--", detail: avgScore ? "Across all repos" : "No data yet", icon: Activity },
     { label: "Total issues", value: String(totalIssues), detail: "Across all repositories", icon: Clock },
-    { label: "Scanned", value: String(readyRepos.length), detail: "Repositories analyzed", icon: CheckCircle2 }
+    { label: "Scanned", value: String(scannedCount), detail: "Repositories analyzed", icon: CheckCircle2 }
   ];
 
   return (
@@ -73,6 +87,8 @@ export default async function DashboardPage() {
             </article>
           ))}
         </section>
+
+        {analyses.length > 0 && <DashboardCharts analyses={analyses} />}
 
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="rounded-lg border bg-white shadow-sm">

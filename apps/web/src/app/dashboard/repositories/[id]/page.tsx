@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { RunAnalysisButton } from "@/components/repositories/run-analysis-button";
+import { ShareRepoPanel } from "@/components/repositories/share-repo-panel";
 
 function getFileIcon(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -31,7 +32,6 @@ export default async function RepositoryDetailPage({
     .from("repositories")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
     .single();
 
   if (!repo) notFound();
@@ -47,6 +47,12 @@ export default async function RepositoryDetailPage({
     .select("*")
     .eq("repository_id", id)
     .order("created_at", { ascending: false });
+
+  const { data: userTeams } = await supabase
+    .from("teams")
+    .select("id, name")
+    .eq("owner_id", user.id)
+    .order("name");
 
   const langs = repo.metadata && typeof repo.metadata === "object" && "languages" in repo.metadata
     ? (repo.metadata.languages as Record<string, number>)
@@ -113,6 +119,10 @@ export default async function RepositoryDetailPage({
             <RunAnalysisButton repositoryId={id} />
           </div>
         </div>
+
+        {userTeams && userTeams.length > 0 && (
+          <ShareRepoPanel repoId={id} teams={userTeams} currentTeamId={repo.team_id} />
+        )}
 
         {analyses && analyses.length > 0 && (
           <div className="mt-6 rounded-lg border bg-white shadow-sm">

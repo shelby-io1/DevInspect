@@ -14,6 +14,41 @@ export interface GitHubFile {
   size: number;
 }
 
+const TEXT_EXTENSIONS = new Set([
+  "txt", "md", "mdx", "json", "yaml", "yml", "xml", "toml", "ini", "cfg", "conf",
+  "js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts",
+  "py", "rb", "go", "rs", "java", "kt", "swift", "php", "cs", "scala",
+  "c", "cpp", "h", "hpp", "mm", "m",
+  "html", "css", "scss", "less", "sass", "svg",
+  "sql", "graphql", "prisma",
+  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
+  "env", "editorconfig", "gitignore", "dockerfile", "makefile",
+  "vue", "svelte", "astro",
+  "tf", "hcl", "proto",
+  "lock", "gradle", "properties"
+]);
+
+const BINARY_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "ico", "webp", "bmp",
+  "woff", "woff2", "ttf", "eot", "otf",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "zip", "tar", "gz", "bz2", "7z", "rar",
+  "exe", "dll", "so", "dylib", "wasm",
+  "mp3", "mp4", "avi", "mov", "wav", "flac", "ogg",
+  "psd", "ai"
+]);
+
+export function isTextFile(path: string, size?: number): boolean {
+  const name = path.toLowerCase();
+  if (name === "dockerfile" || name === "makefile") return true;
+  if (name.endsWith(".gitignore") || name.endsWith(".editorconfig") || name.endsWith(".env")) return true;
+  const ext = name.split(".").pop() || "";
+  if (BINARY_EXTENSIONS.has(ext)) return false;
+  if (TEXT_EXTENSIONS.has(ext)) return true;
+  if (!ext && size != null && size > 0 && size < 102400) return true;
+  return ext === "";
+}
+
 const IGNORED_PATHS = new Set([
   "node_modules", ".git", "dist", "build", "coverage", ".next",
   "__pycache__", ".venv", "venv", ".idea", ".vscode", "target",
@@ -103,6 +138,7 @@ export async function fetchGitHubFiles(
   for (const item of data.tree) {
     if (item.type !== "blob") continue;
     if (shouldIgnore(item.path)) continue;
+    if (!isTextFile(item.path, item.size)) continue;
     contents.push({ path: item.path, size: item.size || 0 });
   }
 
@@ -111,16 +147,18 @@ export async function fetchGitHubFiles(
     const batch = contents.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(async (file) => {
-        const rawUrl = `https://raw.githubusercontent.com/${repoPath}/${branchParam}/${file.path}`;
-        const rawRes = await fetch(rawUrl, {
-          headers: { "User-Agent": "DevInspect" }
-        });
-        if (!rawRes.ok) return null;
-        return {
-          path: file.path,
-          content: await rawRes.text(),
-          size: file.size
-        };
+        try {
+          const rawUrl = `https://raw.githubusercontent.com/${repoPath}/${branchParam}/${file.path}`;
+          const rawRes = await fetch(rawUrl, {
+            headers: { "User-Agent": "DevInspect" }
+          });
+          if (!rawRes.ok) return null;
+          const text = await rawRes.text();
+          if (text.includes("\x00")) return null;
+          return { path: file.path, content: text, size: file.size };
+        } catch {
+          return null;
+        }
       })
     );
 

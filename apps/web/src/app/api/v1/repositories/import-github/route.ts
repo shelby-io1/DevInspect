@@ -77,9 +77,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ...repo, files_count: files.length });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to import repository" },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Failed to import repository";
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("[import-github] Error:", message);
+    if (stack) console.error("[import-github] Stack:", stack);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import AdmZip from "adm-zip";
 import { createClient } from "@/lib/supabase/server";
-import { detectLanguage } from "@/lib/github";
+import { detectLanguage, isTextFile } from "@/lib/github";
 
 const IGNORED_PATHS = new Set([
   "node_modules", ".git", "dist", "build", "coverage", ".next",
@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       if (entry.isDirectory) continue;
       const entryPath = entry.entryName.replace(/\\/g, "/");
       if (shouldIgnore(entryPath)) continue;
+      if (!isTextFile(entryPath)) continue;
 
       const content = entry.getData().toString("utf-8");
       fileRows.push({
