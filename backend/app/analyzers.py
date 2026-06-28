@@ -3,14 +3,12 @@ import os
 import tempfile
 import json
 import re
+import shutil
 from pathlib import Path
 from .models import Issue, FileItem
 
 
-SEMGREP_BIN = os.path.join(
-    os.environ.get("APPDATA", ""),
-    r"Python\Python314\Scripts\pysemgrep.exe"
-)
+SEMGREP_BIN = shutil.which("semgrep") or shutil.which("pysemgrep") or "semgrep"
 
 
 def run_semgrep(files: list[FileItem]) -> list[Issue]:
@@ -220,11 +218,7 @@ def run_eslint(files: list[FileItem]) -> list[Issue]:
     supported = {".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs", ".mts", ".cts"}
     tmpdir = tempfile.mkdtemp()
 
-    npx_paths = [
-        r"C:\Program Files\nodejs\npx.cmd",
-        r"C:\Program Files\nodejs\npx.exe",
-    ]
-    npx_bin = next((p for p in npx_paths if os.path.isfile(p)), "npx")
+    npx_bin = shutil.which("npx") or "npx"
 
     try:
         config = r"""export default [
